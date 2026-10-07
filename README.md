@@ -1,6 +1,6 @@
 # AssemblyTracker
 
-[![CI](https://github.com/YOUR-USERNAME/AssemblyTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR-USERNAME/AssemblyTracker/actions/workflows/ci.yml)
+[![CI](https://github.com/nath-vm/assembly-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/nath-vm/assembly-tracker/actions/workflows/ci.yml)
 
 A full-stack web app for cataloguing **assemblies** (a named group of materials), managing a shared **materials** price list, and exporting a combined **Bill of Materials (BOM)** for any selection of assemblies. Visitors can browse and export; an admin signs in to manage the catalogue.
 
@@ -69,8 +69,8 @@ frontend/
 **Prerequisites:** Node.js 18+, a MongoDB database (e.g. a free Atlas cluster) and a Cloudinary account.
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/AssemblyTracker.git
-cd AssemblyTracker
+git clone https://github.com/nath-vm/assembly-tracker.git
+cd assembly-tracker
 
 # Backend
 cd backend
