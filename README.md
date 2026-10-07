@@ -4,7 +4,7 @@
 
 A full-stack web app for cataloguing **assemblies** (a named group of materials), managing a shared **materials** price list, and exporting a combined **Bill of Materials (BOM)** for any selection of assemblies. Visitors can browse and export; an admin signs in to manage the catalogue.
 
-**Live demo:** https://assembly-tracker-jade.vercel.app
+**Live demo:** https://assemblies-p3.vercel.app
 **API:** https://assembly-tracker.onrender.com/ping *(hosted on Render's free tier, so the first request after idle can take ~30 s to wake up)*
 
 ## Features
