@@ -7,9 +7,6 @@ A full-stack web app for cataloguing **assemblies** (a named group of materials)
 **Live demo:** https://assembly-tracker-jade.vercel.app
 **API:** https://assembly-tracker.onrender.com/ping *(hosted on Render's free tier, so the first request after idle can take ~30 s to wake up)*
 
-<!-- TODO: add 2–3 screenshots, e.g. docs/screenshot-home.png -->
-<!-- ![Home page](docs/screenshot-home.png) -->
-
 ## Features
 
 - **Browse and search** assemblies by title, material code or description, with category filters, sorting and pagination.
@@ -20,6 +17,13 @@ A full-stack web app for cataloguing **assemblies** (a named group of materials)
   - manage categories and the materials price list, including bulk import from spreadsheets with duplicate resolution
   - change the admin password, enable/disable login, and review an **audit log**
 - Responsive UI with an error boundary and toast notifications.
+
+## How it works
+
+1. **Browse:** anyone can open the live demo, search the catalogue and filter by category.
+2. **Build a BOM:** add assemblies to the selection, set a quantity for each, and the app merges identical materials across assemblies, totals quantities and prices, and highlights materials whose price differs between assemblies.
+3. **Export:** download the combined BOM, with a per-assembly breakdown, as an Excel or PDF file.
+4. **Manage (admin):** the admin area is password protected, so it isn't open to visitors. After signing in, the admin can maintain assemblies, categories and the materials price list, import materials in bulk from a spreadsheet, and review the audit log.
 
 ## Tech stack
 
@@ -139,6 +143,18 @@ The API tests mock the database and cover authentication, authorization of hidde
 - Split the largest components (`SelectionCart`, `MaterialManager`) into smaller units and hooks
 - Frontend component tests
 - Upgrade Cloudinary SDK / storage adapter
+
+## Design decisions and known limitations
+
+- **Single shared admin password** instead of user accounts. This keeps the tool simple for one administrator. Multi-user roles would be the next step if the app needed several editors.
+- **Stateless JWT sessions** (8 h, kept in `sessionStorage`). There is no server-side revocation, which is an accepted trade-off at this scale.
+- **In-memory login lockout.** It resets when the server restarts. A shared store such as Redis would make it persistent across instances.
+- **Free-tier hosting:** the API sleeps when idle, so the first request can take around 30 seconds.
+- **Frontend tooling:** the app uses Create React App, which is no longer actively maintained (see the roadmap).
+
+## Author
+
+Built by **Nathaniel Manansala** ([@nath-vm](https://github.com/nath-vm)).
 
 ## License
 
