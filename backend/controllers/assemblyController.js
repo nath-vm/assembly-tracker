@@ -1,3 +1,4 @@
+const { sendServerError } = require("../utils/errors");
 const Assembly   = require("../models/Assembly");
 const AuditLog   = require("../models/AuditLog");
 const cloudinary = require("../config/cloudinary");
@@ -70,13 +71,15 @@ const deleteCloudinaryImage = async (imageUrl) => {
 const getAssemblies = async (req, res) => {
   try {
     const { category, showHidden } = req.query;
-    const query = category && category !== "all" ? { category } : {};
-    if (!showHidden) query.hidden = { $ne: true };
+    // Hidden assemblies are admin-only: the flag is ignored unless a valid token was sent.
+    const includeHidden = Boolean(showHidden) && req.isAdmin === true;
+    const query = category && typeof category === "string" && category !== "all" ? { category } : {};
+    if (!includeHidden) query.hidden = { $ne: true };
 
     const assemblies = await Assembly.find(query).sort({ category: 1, title: 1 });
     res.json(assemblies);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -84,7 +87,9 @@ const getAssemblies = async (req, res) => {
 const searchAssemblies = async (req, res) => {
   try {
     const { q, filter, showHidden } = req.query;
-    if (!q) return res.status(400).json({ error: "Search query (q) is required" });
+    if (!q || typeof q !== "string") return res.status(400).json({ error: "Search query (q) is required" });
+    if (q.length > 100) return res.status(400).json({ error: "Search query is too long" });
+    const includeHidden = Boolean(showHidden) && req.isAdmin === true;
 
     // Escape special regex characters to prevent ReDoS attacks
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -107,12 +112,12 @@ const searchAssemblies = async (req, res) => {
       };
     }
 
-    if (!showHidden) searchQuery.hidden = { $ne: true };
+    if (!includeHidden) searchQuery.hidden = { $ne: true };
 
     const assemblies = await Assembly.find(searchQuery).sort({ category: 1, title: 1 });
     res.json(assemblies);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -133,7 +138,7 @@ const createAssembly = async (req, res) => {
     await logAssembly("ASSEMBLY_CREATED", req, { assemblyId: assembly._id, title: assembly.title });
     res.json(assembly);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -166,7 +171,7 @@ const updateAssembly = async (req, res) => {
     await logAssembly("ASSEMBLY_UPDATED", req, { assemblyId: updated._id, title: updated.title });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -184,7 +189,7 @@ const deleteAssembly = async (req, res) => {
     await logAssembly("ASSEMBLY_DELETED", req, { assemblyId: deleted._id, title: deleted.title });
     res.json({ message: "Assembly deleted successfully" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -206,7 +211,7 @@ const duplicateAssembly = async (req, res) => {
     await logAssembly("ASSEMBLY_DUPLICATED", req, { sourceId: original._id, newId: copy._id, title: copy.title });
     res.json(copy);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -219,9 +224,10 @@ const toggleHidden = async (req, res) => {
       { hidden: !!hidden },
       { new: true }
     );
+    if (!updated) return res.status(404).json({ error: "Assembly not found" });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -234,13 +240,13 @@ const bulkToggleHidden = async (req, res) => {
 
     const invalidIds = ids.filter(id => !isValidObjectId(id));
     if (invalidIds.length > 0)
-      return res.status(400).json({ error: `Invalid IDs provided: ${invalidIds.join(", ")}` });
+      return res.status(400).json({ error: "One or more ids are invalid." });
 
     await Assembly.updateMany({ _id: { $in: ids } }, { hidden: !!hidden });
     await logAssembly("ASSEMBLY_BULK_VISIBILITY", req, { ids, hidden: !!hidden, count: ids.length });
     res.json({ message: "Updated successfully", count: ids.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -253,7 +259,7 @@ const bulkDelete = async (req, res) => {
 
     const invalidIds = ids.filter(id => !isValidObjectId(id));
     if (invalidIds.length > 0)
-      return res.status(400).json({ error: `Invalid IDs provided: ${invalidIds.join(", ")}` });
+      return res.status(400).json({ error: "One or more ids are invalid." });
 
     // Fetch images before deleting so we can clean up Cloudinary
     const toDelete = await Assembly.find({ _id: { $in: ids } }).select("image title");
@@ -270,7 +276,7 @@ const bulkDelete = async (req, res) => {
     });
     res.json({ message: "Deleted successfully", count: result.deletedCount });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -280,6 +286,10 @@ const bulkDuplicate = async (req, res) => {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0)
       return res.status(400).json({ error: "ids array is required" });
+
+    const invalidIds = ids.filter(id => !isValidObjectId(id));
+    if (invalidIds.length > 0)
+      return res.status(400).json({ error: "One or more ids are invalid." });
 
     const originals = await Assembly.find({ _id: { $in: ids } });
     const copies = originals.map((original) => ({
@@ -293,7 +303,7 @@ const bulkDuplicate = async (req, res) => {
     await Assembly.insertMany(copies);
     res.json({ message: "Duplicated successfully", count: copies.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 
@@ -315,7 +325,7 @@ const removeImage = async (req, res) => {
     );
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "assemblyController");
   }
 };
 

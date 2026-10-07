@@ -187,8 +187,8 @@ function PasswordTab({ config, onRefresh, toast }) {
       toast("Please fill in all fields.", "error");
       return;
     }
-    if (newPw.length < 6) {
-      toast("New password must be at least 6 characters.", "error");
+    if (newPw.length < 12) {
+      toast("New password must be at least 12 characters.", "error");
       return;
     }
     if (newPw !== confirmPw) {
@@ -259,7 +259,7 @@ function PasswordTab({ config, onRefresh, toast }) {
           </div>
           <div>
             <label style={labelStyle}>New Password</label>
-            <input type={showPws ? "text" : "password"} placeholder="At least 6 characters"
+            <input type={showPws ? "text" : "password"} placeholder="At least 12 characters"
               value={newPw} onChange={e => setNewPw(e.target.value)}
               style={inputStyle} autoComplete="new-password" />
           </div>

@@ -1,4 +1,8 @@
+const { sendServerError } = require("../utils/errors");
+const mongoose = require("mongoose");
 const Assembly = require("../models/Assembly");
+
+const MAX_ASSEMBLIES_PER_EXPORT = 200;
 
 // ─── Export BOM ───────────────────────────────────────────────────────────────
 const exportBom = async (req, res) => {
@@ -8,8 +12,18 @@ const exportBom = async (req, res) => {
       return res.status(400).json({ error: "No assemblies provided" });
     }
 
-    const ids = assemblies.map((a) => a.id);
-    const assemblyDocs = await Assembly.find({ _id: { $in: ids } });
+    if (assemblies.length > MAX_ASSEMBLIES_PER_EXPORT) {
+      return res.status(400).json({ error: `Too many assemblies (max ${MAX_ASSEMBLIES_PER_EXPORT}).` });
+    }
+    const ids = assemblies.map((a) => a && a.id);
+    if (ids.some((id) => typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ error: "One or more assembly ids are invalid." });
+    }
+
+    // Hidden assemblies are admin-only; public callers can't pull them in by id.
+    const filter = { _id: { $in: ids } };
+    if (req.isAdmin !== true) filter.hidden = { $ne: true };
+    const assemblyDocs = await Assembly.find(filter);
 
     const quantityMap = Object.fromEntries(
       assemblies.map((a) => [a.id, a.quantity])
@@ -99,7 +113,7 @@ const exportBom = async (req, res) => {
       assemblies: assemblyDetails
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "bomController");
   }
 };
 

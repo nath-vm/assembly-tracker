@@ -1,3 +1,4 @@
+const { sendServerError } = require("../utils/errors");
 const mongoose = require("mongoose");
 const Category = require("../models/Category");
 const Assembly = require("../models/Assembly");
@@ -8,7 +9,7 @@ const getCategories = async (req, res) => {
     const categories = await Category.find().sort({ order: 1 });
     res.json(categories);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "categoryController");
   }
 };
 
@@ -19,7 +20,7 @@ const checkCategoryInUse = async (req, res) => {
     const count   = await Assembly.countDocuments({ category: key });
     res.json({ inUse: count > 0, count });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "categoryController");
   }
 };
 
@@ -45,7 +46,7 @@ const addCategory = async (req, res) => {
     const categories = await Category.find().sort({ order: 1 });
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "categoryController");
   }
 };
 
@@ -92,7 +93,7 @@ const editCategory = async (req, res) => {
     const categories = await Category.find().sort({ order: 1 });
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "categoryController");
   }
 };
 
@@ -111,7 +112,7 @@ const deleteCategory = async (req, res) => {
     const categories = await Category.find().sort({ order: 1 });
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "categoryController");
   }
 };
 
@@ -161,7 +162,7 @@ const bulkSaveCategories = async (req, res) => {
     res.json({ success: true, categories: saved });
   } catch (err) {
     await session.abortTransaction();
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "categoryController");
   } finally {
     session.endSession();
   }

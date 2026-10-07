@@ -5,6 +5,15 @@ const router = express.Router();
 const AppConfig = require("./models/AppConfig");
 const AuditLog = require("./models/AuditLog");
 
+// ─── Audit helper (never lets a logging failure break the request) ────────────
+async function audit(entry) {
+  try {
+    await AuditLog.create(entry);
+  } catch (err) {
+    console.error("Audit log write failed:", err.message);
+  }
+}
+
 // ─── Brute-force lockout (in-memory per IP) ───────────────────────────────────
 // After MAX_ATTEMPTS failures within WINDOW_MS, the IP is locked out for
 // LOCKOUT_MS. This is intentionally in-memory: on restart the slate clears,
@@ -62,18 +71,18 @@ function clearFailures(ip) {
 
 // ─── Helper to get client IP ─────────────────────────────────────────────────
 function getClientIp(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || 
-         req.socket?.remoteAddress || 
-         "unknown";
+  // `trust proxy` is set in app.js, so Express resolves the real client IP safely.
+  // Reading X-Forwarded-For directly would let a client spoof their IP and dodge the lockout.
+  return req.ip || req.socket?.remoteAddress || "unknown";
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 router.post("/login", async (req, res) => {
-  const { password } = req.body;
+  const { password } = req.body || {};
   const ip = getClientIp(req);
 
-  if (!password) {
-    await AuditLog.create({ 
+  if (!password || typeof password !== "string") {
+    await audit({ 
       action: 'LOGIN_FAILED', 
       ip, 
       success: false, 
@@ -85,7 +94,7 @@ router.post("/login", async (req, res) => {
   // ─── Brute-force lockout check ────────────────────────────────────────────
   const lockoutMsg = checkLockout(ip);
   if (lockoutMsg) {
-    await AuditLog.create({
+    await audit({
       action: 'LOGIN_BLOCKED',
       ip,
       success: false,
@@ -118,7 +127,7 @@ router.post("/login", async (req, res) => {
         
         clearFailures(ip);
         const token = jwt.sign({ access: true }, process.env.JWT_SECRET, { expiresIn: "8h" });
-        await AuditLog.create({ 
+        await audit({ 
           action: 'LOGIN_SUCCESS', 
           ip, 
           success: true, 
@@ -128,7 +137,7 @@ router.post("/login", async (req, res) => {
         return res.json({ token });
       }
       recordFailure(ip);
-      await AuditLog.create({ 
+      await audit({ 
         action: 'LOGIN_FAILED', 
         ip, 
         success: false, 
@@ -139,7 +148,7 @@ router.post("/login", async (req, res) => {
 
     // Check if login is enabled
     if (cfg.loginEnabled === false) {
-      await AuditLog.create({ 
+      await audit({ 
         action: 'LOGIN_FAILED', 
         ip, 
         success: false, 
@@ -152,7 +161,7 @@ router.post("/login", async (req, res) => {
     const isValid = await bcrypt.compare(password, cfg.passwordHash);
     if (!isValid) {
       recordFailure(ip);
-      await AuditLog.create({ 
+      await audit({ 
         action: 'LOGIN_FAILED', 
         ip, 
         success: false, 
@@ -163,7 +172,7 @@ router.post("/login", async (req, res) => {
 
     clearFailures(ip);
     const token = jwt.sign({ access: true }, process.env.JWT_SECRET, { expiresIn: "8h" });
-    await AuditLog.create({ 
+    await audit({ 
       action: 'LOGIN_SUCCESS', 
       ip, 
       success: true, 
@@ -172,11 +181,11 @@ router.post("/login", async (req, res) => {
     res.json({ token });
   } catch (err) {
     console.error("Login error:", err);
-    await AuditLog.create({ 
+    await audit({ 
       action: 'LOGIN_FAILED', 
       ip, 
       success: false, 
-      detail: 'Server error: ' + err.message 
+      detail: 'Server error' 
     });
     res.status(500).json({ error: "Server error during login" });
   }
@@ -199,4 +208,20 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { router, requireAuth };
+// Non-blocking: attaches req.isAdmin = true when a valid token is present.
+// Public routes use it to decide whether admin-only data (hidden assemblies) may be returned.
+// An invalid/expired token is treated as "not admin" rather than an error.
+function optionalAuth(req, res, next) {
+  req.isAdmin = false;
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (token) {
+    try {
+      jwt.verify(token, process.env.JWT_SECRET);
+      req.isAdmin = true;
+    } catch { /* ignore — treated as public visitor */ }
+  }
+  next();
+}
+
+module.exports = { router, requireAuth, optionalAuth };

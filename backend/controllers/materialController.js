@@ -1,3 +1,4 @@
+const { sendServerError } = require("../utils/errors");
 const Material = require("../models/Material");
 const Assembly = require("../models/Assembly");
 
@@ -48,7 +49,7 @@ const getMaterials = async (req, res) => {
     }).collation({ locale: 'en', strength: 2 }).sort({ name: 1 });
     res.json(materials);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 
@@ -75,7 +76,7 @@ const addMaterial = async (req, res) => {
     await material.save();
     res.json(material);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 
@@ -125,7 +126,7 @@ const editMaterial = async (req, res) => {
 
     res.json({ ...material.toObject(), assembliesUpdated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 
@@ -147,7 +148,7 @@ const deleteMaterial = async (req, res) => {
     await material.deleteOne();
     res.json({ message: "Material deleted successfully" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 
@@ -164,7 +165,7 @@ const checkMaterialDuplicates = async (req, res) => {
     }).select("name unitOfMeasure price");
     res.json({ matches });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 
@@ -229,7 +230,7 @@ const bulkImportMaterials = async (req, res) => {
 
     res.json({ imported, overwritten, skipped, failed, assembliesUpdated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 
@@ -256,7 +257,7 @@ const syncAllMaterials = async (req, res) => {
       totalAssembliesUpdated
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendServerError(res, err, "materialController");
   }
 };
 

@@ -30,9 +30,13 @@ function LoginPage({ onLogin, onBack }) {
           setError(data.error);
         } else if (data.error === "Login is currently disabled by the administrator.") {
           setError("Login is currently disabled by the administrator.");
-        } else {
+        } else if (data.error === "Incorrect password") {
           setError("Incorrect password. Please try again.");
           setPassword("");
+        } else {
+          // Show the server's real message (e.g. server error) instead of
+          // misreporting every failure as a wrong password.
+          setError(typeof data.error === "string" ? data.error : "Login failed. Please try again.");
         }
       } else if (data.token) {
         sessionStorage.setItem("token", data.token);

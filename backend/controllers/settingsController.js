@@ -52,8 +52,8 @@ exports.changePassword = async (req, res) => {
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: "Both current and new password are required." });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: "New password must be at least 6 characters." });
+  if (newPassword.length < 12) {
+    return res.status(400).json({ error: "New password must be at least 12 characters." });
   }
 
   const cfg = await getConfig();
