@@ -4,7 +4,7 @@
 
 A full-stack web app for cataloguing **assemblies** (a named group of materials), managing a shared **materials** price list, and exporting a combined **Bill of Materials (BOM)** for any selection of assemblies. Visitors can browse and export; an admin signs in to manage the catalogue.
 
-**Live demo:** https://assemblies-p3.vercel.app
+**Live demo:** https://assemblies-p3.vercel.app  
 **API:** https://assembly-tracker.onrender.com/ping *(hosted on Render's free tier, so the first request after idle can take ~30 s to wake up)*
 
 ## Features
@@ -20,10 +20,19 @@ A full-stack web app for cataloguing **assemblies** (a named group of materials)
 
 ## How it works
 
-1. **Browse:** anyone can open the live demo, search the catalogue and filter by category.
-2. **Build a BOM:** add assemblies to the selection, set a quantity for each, and the app merges identical materials across assemblies, totals quantities and prices, and highlights materials whose price differs between assemblies.
-3. **Export:** download the combined BOM, with a per-assembly breakdown, as an Excel or PDF file.
-4. **Manage (admin):** the admin area is password protected, so it isn't open to visitors. After signing in, the admin can maintain assemblies, categories and the materials price list, import materials in bulk from a spreadsheet, and review the audit log.
+```mermaid
+flowchart LR
+  B[Browser] -->|HTML, JS| V[Vercel<br/>React app]
+  B -->|/api/*  same origin| V
+  V -->|rewrite /api/* to| R[Render<br/>Express API]
+  R --> M[(MongoDB Atlas)]
+  R -->|store/resize| C[Cloudinary]
+```
+
+1. The React app is hosted on **Vercel**, which proxies every `/api/*` request directly to the Express API on **Render** (`frontend/vercel.json`).
+2. Because the browser only communicates with one origin, **CORS is not needed** and login cookies/session headers are first-party.
+3. **Admin login:** The admin submits the password, which the API verifies against a stored bcrypt hash before issuing a JWT token.
+4. **Every sensitive route is protected on the server** via middleware (`backend/middleware/auth.js`), rather than merely hiding elements in the frontend UI.
 
 ## Tech stack
 
@@ -36,11 +45,6 @@ A full-stack web app for cataloguing **assemblies** (a named group of materials)
 | Testing / CI | Jest + Supertest, GitHub Actions |
 
 ## Architecture
-
-```
-React SPA (Vercel)  ──HTTPS/JSON──▶  Express API (Render)  ──▶  MongoDB Atlas
-                                           └──────────────────▶  Cloudinary (images)
-```
 
 ```
 backend/
@@ -73,7 +77,7 @@ frontend/
 **Prerequisites:** Node.js 18+, a MongoDB database (e.g. a free Atlas cluster) and a Cloudinary account.
 
 ```bash
-git clone https://github.com/nath-vm/assembly-tracker.git
+git clone [https://github.com/nath-vm/assembly-tracker.git](https://github.com/nath-vm/assembly-tracker.git)
 cd assembly-tracker
 
 # Backend
