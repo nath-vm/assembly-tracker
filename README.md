@@ -22,17 +22,16 @@ A full-stack web app for cataloguing **assemblies** (a named group of materials)
 
 ```mermaid
 flowchart LR
-  B[Browser] -->|HTML, JS| V[Vercel<br/>React app]
-  B -->|/api/*  same origin| V
-  V -->|rewrite /api/* to| R[Render<br/>Express API]
+  B[Browser] -->|loads the app| V[Vercel<br/>React app]
+  B -->|JSON over HTTPS, Bearer token| R[Render<br/>Express API]
   R --> M[(MongoDB Atlas)]
-  R -->|store/resize| C[Cloudinary]
+  R -->|store/resize images| C[Cloudinary]
 ```
 
-1. The React app is hosted on **Vercel**, which proxies every `/api/*` request directly to the Express API on **Render** (`frontend/vercel.json`).
-2. Because the browser only communicates with one origin, **CORS is not needed** and login cookies/session headers are first-party.
-3. **Admin login:** The admin submits the password, which the API verifies against a stored bcrypt hash before issuing a JWT token.
-4. **Every sensitive route is protected on the server** via middleware (`backend/middleware/auth.js`), rather than merely hiding elements in the frontend UI.
+1. The React app is served as static files from **Vercel**. `frontend/vercel.json` rewrites every route to `index.html` so client-side routing works on refresh.
+2. The browser calls the Express API on **Render** directly, at the URL baked into the build as `REACT_APP_BACKEND_URL`. Because the API is a different origin, it only accepts requests from the origins listed in `ALLOWED_ORIGINS` (a CORS allow-list).
+3. **Admin login:** the admin submits the password to `/auth/login`. The API verifies it against a stored bcrypt hash and returns a JWT (8 h expiry). The frontend keeps the token in `sessionStorage` and sends it in the `Authorization: Bearer` header.
+4. **Every sensitive route is protected on the server** by the `requireAuth` middleware in `backend/auth.js`, not just hidden in the frontend UI.
 
 ## Tech stack
 
@@ -51,6 +50,7 @@ backend/
   app.js            Express app: middleware, routes, error handling (importable for tests)
   server.js         Entry point: env checks, DB connection, listen
   auth.js           Login, JWT middleware (requireAuth / optionalAuth), brute-force lockout
+  config/           Cloudinary, Multer (image upload) and JWT secret setup
   routes/           Route definitions
   controllers/      Request handlers
   models/           Mongoose schemas
@@ -74,10 +74,10 @@ frontend/
 
 ## Getting started
 
-**Prerequisites:** Node.js 18+, a MongoDB database (e.g. a free Atlas cluster) and a Cloudinary account.
+**Prerequisites:** Node.js 20.19+, a MongoDB database (e.g. a free Atlas cluster) and a Cloudinary account.
 
 ```bash
-git clone [https://github.com/nath-vm/assembly-tracker.git](https://github.com/nath-vm/assembly-tracker.git)
+git clone https://github.com/nath-vm/assembly-tracker.git
 cd assembly-tracker
 
 # Backend
@@ -104,7 +104,7 @@ Log in with the value you set as `SECRET_KEY`, then change it under **Settings**
 | `MONGO_URI` | MongoDB connection string |
 | `JWT_SECRET` | Token signing key, 32+ chars (`openssl rand -hex 32`) |
 | `SECRET_KEY` | Starter admin password (used only until a password exists in the DB) |
-| `ALLOWED_ORIGINS` | Comma-separated frontend origins allowed by CORS |
+| `ALLOWED_ORIGINS` | Comma-separated frontend origins allowed by CORS (defaults to `http://localhost:3000` if unset) |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Image storage |
 | `PORT`, `NODE_ENV` | Server port and environment |
 
@@ -138,8 +138,8 @@ The API tests mock the database and cover authentication, authorization of hidde
 
 ## Deployment
 
-- **Backend (Render):** root directory `backend`, build `npm install`, start `npm start`; set the environment variables above.
-- **Frontend (Vercel):** root directory `frontend`; set `REACT_APP_BACKEND_URL`. `vercel.json` rewrites all routes to `index.html`.
+- **Backend (Render):** root directory `backend`, build command `npm install`, start command `npm start`, health check path `/ping`. Set the environment variables above, plus `NODE_VERSION=22`. Set `ALLOWED_ORIGINS` to the Vercel site URL, otherwise browsers will block requests to the API.
+- **Frontend (Vercel):** root directory `frontend`; set `REACT_APP_BACKEND_URL` to the Render API URL (no trailing slash). The value is baked in at build time, so redeploy after changing it. `vercel.json` rewrites all routes to `index.html`.
 
 ## Roadmap
 
